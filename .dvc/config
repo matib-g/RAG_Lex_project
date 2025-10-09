@@ -1,0 +1,4 @@
+[core]
+    remote = storage
+['remote "storage"']
+    url = /Users/mateuszbulanda-gorol/Desktop/Projects/data_for_projects/rag_lex_project_data
