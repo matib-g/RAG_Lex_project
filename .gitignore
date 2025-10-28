@@ -2,3 +2,4 @@
 data/prepared_dataset.json
 .DS_Store
 .vscode/
+*/.DS_Store
