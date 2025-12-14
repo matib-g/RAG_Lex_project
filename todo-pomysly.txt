@@ -1,0 +1,16 @@
+1. obsługa konfiguracji poprzez zmienne środowiskowe (.env)
+2. testy jednostkowe (Unit Tests) i integracyjne (pytest)
+3. continuous integration (CI) pipeline (np. GitHub Actions)
+4. konteneryzacja (Docker) dla łatwiejszego wdrażania i rozwoju
+5. sprawdzanie nowych aktów prawnych i uaktualnianie bazy
+6. baza cache?
+7. asynchroniczność i streaming
+8. metryki jakości
+9. ewaluacja jakości (BLEU, ROUGE, METEOR) i monitoring jakości (czas retrievalu, czas generacji, średni dystans embeddingów, oceny użytkowników)
+10. działająca API (FastAPI) / prosty frontend (Gradio/Streamlit)
+11. dashboard do podglądu źródeł odpowiedzi / możliwość przejścia do dokumentu na stronie ISAP
+12. wizualizacja pipeline'u
+13. personalizacja (pamięta kontekst/użytkownika)
+14. tryb wyjaśniania aktów prawnych prostym językiem (do tego może drugi model?)
+15. multi-modalność (PDF, obrazy, tabele)
+16. wdrożyć projekt w chmurze (AWS, GCP, Azure)
