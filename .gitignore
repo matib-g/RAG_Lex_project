@@ -5,3 +5,5 @@ data/prepared_dataset.json
 */.DS_Store
 .env
 /models
+__pycache__/
+*/__pycache__/

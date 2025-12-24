@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    image: rag_lex_project:latest
+    container_name: rag_lex_app
+    volumes:
+      # Data persistance
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./vectordb:/app/vectordb
+      # Development: mount source code for live reload (optional, good for dev)
+      - ./src:/app/src
+      - ./main.py:/app/main.py
+    # Load environment variables from .env
+    env_file:
+      - .env
+    # Keep container running for interactive commands
+    tty: true
+    stdin_open: true
+    # Default command (can be overridden)
+    command: python main.py --help

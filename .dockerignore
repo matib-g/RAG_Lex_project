@@ -1,0 +1,30 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesize
+
+# Ignore local config
+.env
+
+# Ignore heavy directories (mounted via volumes)
+data/
+models/
+vectordb/
+notebooks/

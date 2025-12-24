@@ -1,7 +1,7 @@
 1. done - obsługa konfiguracji poprzez zmienne środowiskowe (.env)
 2. done - testy jednostkowe (Unit Tests) i integracyjne (pytest)
 3. done - continuous integration (CI) pipeline (np. GitHub Actions)
-4. konteneryzacja (Docker) dla łatwiejszego wdrażania i rozwoju
+4. done - konteneryzacja (Docker) dla łatwiejszego wdrażania i rozwoju [DONE]
 5. sprawdzanie nowych aktów prawnych i uaktualnianie bazy
 6. baza cache?
 7. asynchroniczność i streaming
