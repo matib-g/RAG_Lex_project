@@ -1,6 +1,6 @@
-1. obsługa konfiguracji poprzez zmienne środowiskowe (.env)
-2. testy jednostkowe (Unit Tests) i integracyjne (pytest)
-3. continuous integration (CI) pipeline (np. GitHub Actions)
+1. done - obsługa konfiguracji poprzez zmienne środowiskowe (.env)
+2. done - testy jednostkowe (Unit Tests) i integracyjne (pytest)
+3. done - continuous integration (CI) pipeline (np. GitHub Actions)
 4. konteneryzacja (Docker) dla łatwiejszego wdrażania i rozwoju
 5. sprawdzanie nowych aktów prawnych i uaktualnianie bazy
 6. baza cache?
