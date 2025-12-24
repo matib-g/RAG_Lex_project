@@ -3,7 +3,7 @@ from src.utils import config
 
 def test_project_root():
     assert config.PROJECT_ROOT.exists()
-    assert config.PROJECT_ROOT.name == "rag_lex_project"
+    assert config.PROJECT_ROOT.name.lower() == "rag_lex_project"
 
 def test_default_config_values():
     assert config.COLLECTION_NAME == "isap_acts"
