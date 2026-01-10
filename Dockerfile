@@ -22,4 +22,5 @@ COPY main.py .
 COPY .env.example .
 
 # By default, we can run help to show usage
-CMD ["python", "main.py", "--help"]
+# Default command starts the API server
+CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

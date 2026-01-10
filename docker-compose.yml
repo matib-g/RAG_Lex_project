@@ -5,6 +5,8 @@ services:
     build: .
     image: rag_lex_project:latest
     container_name: rag_lex_app
+    ports:
+      - "8000:8000"
     volumes:
       # Data persistance
       - ./data:/app/data
@@ -19,5 +21,5 @@ services:
     # Keep container running for interactive commands
     tty: true
     stdin_open: true
-    # Default command (can be overridden)
-    command: python main.py --help
+    # Use Dockerfile default CMD (uvicorn) or override here.
+    # command: python main.py --help

@@ -55,14 +55,47 @@ class SejmDownloader:
             logger.error(f"Failed to fetch content for {publisher}/{year}/{num}: {e}")
             raise
 
-    def download_acts(self, publisher: str, year: int, limit: int = 100, offset: int = 0) -> List[Dict]:
+    def check_for_updates(self, publisher: str, year: int) -> List[Dict]:
+        """
+        Populate a list of missing acts for a given publisher and year.
+        Fetch all acts metadata first (limit=9999), check local existence.
+        """
+        logger.info(f"Checking for updates {publisher}/{year}...")
+        
+        # 1. Get all acts metadata
+        # Assuming < 5000 acts per year usually
+        all_acts_data = self.fetch_acts_for_year(publisher, year, limit=5000, offset=0)
+        all_items = all_acts_data.get("items", [])
+        
+        missing_items = []
+        for item in all_items:
+            pos = item.get("pos")
+            # Expected filename for HTML
+            fname_html = f"{publisher}_{year}_{pos}.html"
+            fname_pdf = f"{publisher}_{year}_{pos}.pdf"
+            
+            path_html = self.save_dir / fname_html
+            path_pdf = self.save_dir / fname_pdf
+            
+            # Check if either exists. We prefer HTML.
+            if not path_html.exists() and not path_pdf.exists():
+                missing_items.append(item)
+                
+        logger.info(f"Found {len(missing_items)} missing acts for {publisher}/{year}.")
+        return missing_items
+
+    def download_acts(self, publisher: str, year: int, limit: int = 100, offset: int = 0, specific_items: List[Dict] = None) -> List[Dict]:
         """
         Main method to download files and save them locally. Returns a manifest of downloaded files.
+        If specific_items is provided, it processes only those items (ignoring limit/offset).
         """
-        logger.info(f"Starting download for {publisher}/{year} (Limit: {limit}, Offset: {offset})")
-        
-        acts_data = self.fetch_acts_for_year(publisher, year, limit, offset)
-        items = acts_data.get("items", [])
+        if specific_items is not None:
+             logger.info(f"Downloading {len(specific_items)} specific items for {publisher}/{year}")
+             items = specific_items
+        else:
+            logger.info(f"Starting download for {publisher}/{year} (Limit: {limit}, Offset: {offset})")
+            acts_data = self.fetch_acts_for_year(publisher, year, limit, offset)
+            items = acts_data.get("items", [])
         
         manifest = []
         
@@ -120,8 +153,10 @@ class SejmDownloader:
             except Exception as e:
                 logger.error(f"Error processing act {publisher} {year} {pos}: {e}")
 
-        # Save manifest
-        manifest_path = self.save_dir / f"{publisher}_{year}_manifest.json"
+        # Save manifest (append or new?) 
+        # For simplicity, we create a partial manifest for this run
+        timestamp = int(time.time())
+        manifest_path = self.save_dir / f"{publisher}_{year}_manifest_{timestamp}.json"
         with open(manifest_path, "w", encoding="utf-8") as mf:
             json.dump(manifest, mf, ensure_ascii=False, indent=2)
             

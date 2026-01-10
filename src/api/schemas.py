@@ -1,0 +1,29 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class QueryRequest(BaseModel):
+    query: str = Field(..., description="The user's legal question to answer.")
+    top_k: int = Field(5, description="Number of source documents to retrieve.")
+
+class Source(BaseModel):
+    citation: str
+    text: str
+    rank: int
+    score: float
+
+class QueryResponse(BaseModel):
+    question: str
+    answer: str
+    sources: List[Source]
+
+class UpdateRequest(BaseModel):
+    publisher: str = "DU"
+    year: int = 2020
+    limit: int = 10
+    max_chars: int = 1000
+    batch_size: int = 64
+
+class UpdateResponse(BaseModel):
+    status: str
+    message: str
+    downloaded_files: Optional[List[str]] = None

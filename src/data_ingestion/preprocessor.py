@@ -55,19 +55,32 @@ class DataPreprocessor:
                 
         return chunks
 
-    def process_files(self, max_chars: int = 1000) -> List[Dict]:
+    def process_files(self, max_chars: int = 1000, specific_files: List[str] = None) -> List[Dict]:
         """
-        Converts all HTML files in the directory into a list of chunks with metadata.
+        Converts HTML files (from directory or specific list) into a list of chunks with metadata.
+        If specific_files is None, checks all *.html in input_dir and overwrites output_file.
+        If specific_files is provided, processes only those files and DOES NOT overwrite main output_file (returns data).
         """
         dataset = []
-        if not self.input_dir.exists():
-            logger.error(f"Input directory does not exist: {self.input_dir}")
-            return []
+        
+        target_files = []
+        if specific_files:
+            # Assume specific_files contains filenames (not full paths)
+            for fname in specific_files:
+                target_files.append(self.input_dir / fname)
+            logger.info(f"Processing {len(target_files)} specific files.")
+        else:
+            if not self.input_dir.exists():
+                logger.error(f"Input directory does not exist: {self.input_dir}")
+                return []
+            target_files = list(self.input_dir.glob("*.html"))
+            logger.info(f"Found {len(target_files)} HTML files to process in {self.input_dir}")
 
-        files = list(self.input_dir.glob("*.html"))
-        logger.info(f"Found {len(files)} HTML files to process in {self.input_dir}")
-
-        for path in files:
+        for path in target_files:
+            if not path.exists():
+                logger.warning(f"File {path} does not exist, skipping.")
+                continue
+                
             fname = path.name
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -103,14 +116,16 @@ class DataPreprocessor:
             except Exception as e:
                 logger.error(f"Error processing file {fname}: {e}")
 
-        # Ensure output dir exists
-        if not self.output_file.parent.exists():
-            self.output_file.parent.mkdir(parents=True, exist_ok=True)
+        # If we are processing everything, we save to the main file
+        if specific_files is None:
+            # Ensure output dir exists
+            if not self.output_file.parent.exists():
+                self.output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(self.output_file, "w", encoding="utf-8") as f:
-            json.dump(dataset, f, ensure_ascii=False, indent=2)
-        
-        logger.info(f"Saved {len(dataset)} chunks to {self.output_file}")
+            with open(self.output_file, "w", encoding="utf-8") as f:
+                json.dump(dataset, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved {len(dataset)} chunks to {self.output_file}")
+            
         return dataset
 
 if __name__ == "__main__":

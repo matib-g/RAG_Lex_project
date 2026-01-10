@@ -78,10 +78,65 @@ def main():
     parser_index.add_argument("--batch_size", type=int, default=64, help="Batch size for embedding")
     parser_index.set_defaults(func=run_index)
 
+def run_update(args):
+    logger.info("Starting Incremental Update...")
+    
+    # 1. Check for updates
+    downloader = SejmDownloader()
+    missing_items = downloader.check_for_updates(args.publisher, args.year)
+    
+    if not missing_items:
+        logger.info("No updates found.")
+        return
+
+    # 2. Limit updates (Safety Brake)
+    to_download = missing_items[:args.limit]
+    logger.info(f"Downloading {len(to_download)} new acts (out of {len(missing_items)} missing).")
+    
+    # 3. Download specific items
+    manifest = downloader.download_acts(args.publisher, args.year, specific_items=to_download)
+    
+    if not manifest:
+        logger.warning("No files downloaded.")
+        return
+        
+    downloaded_files = [item["filename"] for item in manifest]
+    
+    # 4. Process new files
+    logger.info("Processing new files...")
+    preprocessor = DataPreprocessor()
+    # returns list of dicts (chunks)
+    new_data = preprocessor.process_files(max_chars=args.max_chars, specific_files=downloaded_files)
+    
+    if not new_data:
+        logger.warning("No data extracted from new files.")
+        return
+
+    # 5. Index new data
+    logger.info("Indexing new data...")
+    # Initialize models
+    emb_model = EmbeddingModel()
+    vector_store = VectorStore()
+    indexer = VectorIndexer(vector_store, emb_model)
+    
+    indexer.index_data(dataset=new_data, batch_size=args.batch_size)
+    logger.info("Incremental Update Completed Successfully.")
+
+# ... (inside main function)
+
     # RAG
     parser_rag = subparsers.add_parser("rag", help="Run RAG pipeline")
     parser_rag.add_argument("--query", "-q", type=str, help="Query text (optional, runs interactive if missing)")
     parser_rag.set_defaults(func=run_rag)
+
+    # Update
+    parser_update = subparsers.add_parser("update", help="Check for missing acts and update DB incrementally")
+    parser_update.add_argument("--publisher", type=str, default="DU", help="Publisher")
+    parser_update.add_argument("--year", type=int, default=2020, help="Year")
+    parser_update.add_argument("--limit", type=int, default=10, help="Max number of new acts to download")
+    parser_update.add_argument("--max_chars", type=int, default=1000, help="Chunk size")
+    parser_update.add_argument("--batch_size", type=int, default=64, help="Batch size")
+    parser_update.set_defaults(func=run_update)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

@@ -13,19 +13,26 @@ class VectorIndexer:
         self.vector_store = vector_store
         self.embedding_model = embedding_model
 
-    def index_data(self, data_path: Union[str, Path] = PREPARED_DATA_FILE, batch_size: int = 64):
+    def index_data(self, data_path: Union[str, Path] = PREPARED_DATA_FILE, batch_size: int = 64, dataset: list = None):
         """
-        Loads the prepared dataset and indexes it into the vector store.
+        Indexes data into the vector store.
+        If `dataset` list is provided, uses it directly.
+        Otherwise loads from `data_path`.
         """
-        path = Path(data_path)
-        if not path.exists():
-            logger.error(f"Dataset file not found: {path}")
+        if dataset is None:
+            path = Path(data_path)
+            if not path.exists():
+                logger.error(f"Dataset file not found: {path}")
+                return
+
+            with open(path, "r", encoding="utf-8") as f:
+                dataset = json.load(f)
+
+        logger.info(f"Loaded {len(dataset)} items. Starting indexing...")
+
+        if not dataset:
+            logger.warning("Dataset is empty. Skipping indexing.")
             return
-
-        with open(path, "r", encoding="utf-8") as f:
-            dataset = json.load(f)
-
-        logger.info(f"Loaded {len(dataset)} items from dataset. Starting indexing...")
 
         texts = [item["text"] for item in dataset]
         ids = [f"{item['metadata']['filename']}_{item['metadata'].get('chunk_id', i)}" for i, item in enumerate(dataset)]
