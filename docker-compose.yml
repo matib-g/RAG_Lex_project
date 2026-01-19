@@ -23,3 +23,23 @@ services:
     stdin_open: true
     # Use Dockerfile default CMD (uvicorn) or override here.
     # command: python main.py --help
+
+  frontend:
+    build: .
+    image: rag_lex_project:latest
+    container_name: rag_lex_frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./src:/app/src
+      - ./main.py:/app/main.py
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./vectordb:/app/vectordb
+    env_file:
+      - .env
+    environment:
+      - API_URL=http://app:8000
+    command: streamlit run src/ui/app.py --server.address 0.0.0.0 --server.port 8501
+    depends_on:
+      - app

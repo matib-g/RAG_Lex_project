@@ -7,3 +7,5 @@ data/prepared_dataset.json
 /models
 __pycache__/
 */__pycache__/
+/vectordb
+*.pyc

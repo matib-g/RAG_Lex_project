@@ -30,9 +30,9 @@ async def lifespan(app: FastAPI):
         logger.info("Startup: RAG pipeline initialized successfully.")
     except Exception as e:
         logger.error(f"Startup: Failed to initialize pipeline: {e}")
-        # We might want to raise, or allow app to start in "degraded" mode
-        # causing health check to fail.
-        raise e
+        # Allow app to start in "degraded" mode
+        app.state.pipeline = None
+        # raise e  <-- Commented out to prevent crash
         
     yield
     

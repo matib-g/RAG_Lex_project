@@ -127,6 +127,8 @@ sentence-transformers
 chromadb
 llama-cpp-python
 beautifulsoup4
+streamlit
+requests
 fastapi
 uvicorn[standard]
 pydantic

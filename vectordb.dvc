@@ -1,0 +1,6 @@
+outs:
+- md5: 6ad7dfa95a248f8de801fca3b5c2167c.dir
+  size: 289122230
+  nfiles: 7
+  hash: md5
+  path: vectordb

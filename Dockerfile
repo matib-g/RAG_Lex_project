@@ -21,6 +21,12 @@ COPY src/ src/
 COPY main.py .
 COPY .env.example .
 
-# By default, we can run help to show usage
+# Copy and setup entrypoint
+COPY src/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Use entrypoint to handle startup logic
+ENTRYPOINT ["/app/entrypoint.sh"]
+
 # Default command starts the API server
 CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
