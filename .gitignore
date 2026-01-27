@@ -9,3 +9,6 @@ __pycache__/
 */__pycache__/
 /vectordb
 *.pyc
+.pytest_cache/
+evaluation_results.json
+*.log
