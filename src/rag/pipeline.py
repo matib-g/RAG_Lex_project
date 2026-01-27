@@ -1,8 +1,8 @@
-import textwrap
 import json
 from typing import List, Tuple, Dict, Any
 from src.utils.config import PROMPT_MAX_CHARS, LLAMA_N_CTX
 from src.utils.logger import setup_logger
+from src.utils.cache import generate_cache_key, get_cache, set_cache
 from src.database.vector_store import VectorStore
 from src.models.embedding import EmbeddingModel
 from src.models.llm import LlamaModel
@@ -78,12 +78,24 @@ class RAGPipeline:
         
         # Simple truncation to fit context window approximately (considering system prompt + generation)
         # 1 token approx 4 chars, so LLAMA_N_CTX * 4 is rough char limit.
-        return textwrap.shorten(prompt, width=LLAMA_N_CTX * 3, placeholder="...")
+        if len(prompt) > LLAMA_N_CTX * 3:
+            return prompt[:LLAMA_N_CTX * 3] + "..."
+        return prompt
+
 
     def run(self, query: str, top_k: int = 5) -> Dict[str, Any]:
         """
         Runs the full RAG pipeline: Retrieve -> Generate.
+        Checks cache first to avoid redundant LLM calls.
         """
+        # Check cache first
+        cache_key = generate_cache_key(query, top_k)
+        cached_result = get_cache(cache_key)
+        if cached_result:
+            logger.info("Returning cached response")
+            cached_result["from_cache"] = True
+            return cached_result
+        
         context_text, hits = self.retrieve(query, top_k=top_k)
         
         if not context_text.strip():
@@ -91,7 +103,8 @@ class RAGPipeline:
             return {
                 "answer": "Nie znaleziono odpowiednich fragmentów w bazie wiedzy, aby odpowiedzieć na to pytanie.",
                 "hits": hits,
-                "context": context_text
+                "context": context_text,
+                "from_cache": False
             }
 
         prompt = self.build_prompt(query, context_text)
@@ -99,9 +112,20 @@ class RAGPipeline:
 
         answer, raw_response = self.llm_model.generate(prompt)
         
-        return {
+        result = {
             "answer": answer,
             "hits": hits,
             "prompt": prompt,
-            "raw_response": raw_response
+            "raw_response": raw_response,
+            "from_cache": False
         }
+        
+        # Store in cache (exclude raw_response to save space)
+        cache_data = {
+            "answer": answer,
+            "hits": hits,
+            "from_cache": True
+        }
+        set_cache(cache_key, cache_data)
+        
+        return result

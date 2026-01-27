@@ -5,7 +5,8 @@ import json
 
 # Configuration
 API_URL = os.getenv("API_URL", "http://app:8000")
-API_ENDPOINT = f"{API_URL}/api/v1/query"
+STREAM_ENDPOINT = f"{API_URL}/api/v1/query/stream"
+HEALTH_ENDPOINT = f"{API_URL}/api/v1/health"
 
 st.set_page_config(
     page_title="RAG Lex - Polski System Prawny",
@@ -13,38 +14,15 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS for better aesthetics
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #f8f9fa;
-    }
-    .source-box {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 5px solid #007bff;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .citation {
-        font-weight: bold;
-        color: #007bff;
-        font-size: 0.9em;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("⚖️ RAG Lex - Inteligentny Asystent Prawny")
 st.markdown("Zadaj pytanie dotyczące polskich ustaw z 2020 roku.")
 
-# Initialize chat history
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Sidebar for information and settings
+# Sidebar
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Seal_of_the_Senate_of_Poland.svg/1200px-Seal_of_the_Senate_of_Poland.svg.png", width=100)
     st.header("Informacje")
     st.info("""
         System wykorzystuje technikę RAG (Retrieval-Augmented Generation), 
@@ -62,7 +40,7 @@ with st.sidebar:
     st.divider()
     # Health check
     try:
-        health = requests.get(f"{API_URL}/api/v1/health", timeout=2)
+        health = requests.get(HEALTH_ENDPOINT, timeout=2)
         if health.status_code == 200:
             st.success("✅ Połączono z API")
         else:
@@ -70,78 +48,79 @@ with st.sidebar:
     except:
         st.error("❌ Brak połączenia z API")
 
-# Display chat messages from history
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if "sources" in message and message["sources"]:
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        
+        if msg.get("sources"):
             with st.expander("Zobacz źródła"):
-                for source in message["sources"]:
-                    st.markdown(f"""
-                        <div class="source-box">
-                            <div class="citation">{source['citation']} (Prawdopodobieństwo: {1 - source['score']:.2f})</div>
-                            <div style="font-size: 0.85em; margin-top: 5px;">{source['text'][:500]}...</div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                for source in msg["sources"]:
+                    score_val = source.get('score', 0)
+                    prob = (1 - score_val) if score_val is not None else 0.0
+                    st.markdown(f"**{source['citation']}** (Relevance: {prob:.2f})")
+                    st.text(source['text'][:500] + "...")
+                    st.divider()
 
 # Chat input
 if prompt := st.chat_input("O co chcesz zapytać?"):
-    # Add user message to history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # Display user message
+    st.session_state.messages.append({"role": "user", "content": prompt, "sources": None})
     with st.chat_message("user"):
         st.markdown(prompt)
-
-    # Call API for RAG response
+    
+    # Stream AI response
     with st.chat_message("assistant"):
-        with st.spinner("Przeszukuję bazę aktów prawnych i generuję odpowiedź..."):
-            try:
-                payload = {
-                    "query": prompt,
-                    "top_k": top_k
-                }
-                import time
-                start_time = time.time()
-                response = requests.post(API_ENDPOINT, json=payload, timeout=300)
-                duration = time.time() - start_time
-                
+        placeholder = st.empty()
+        full_response = ""
+        sources = []
+        
+        try:
+            payload = {"query": prompt, "top_k": top_k}
+            
+            with requests.post(STREAM_ENDPOINT, json=payload, stream=True, timeout=300) as response:
                 if response.status_code == 200:
-                    data = response.json()
-                    answer = data.get("answer", "")
-                    sources = data.get("sources", [])
+                    for line in response.iter_lines(decode_unicode=True):
+                        if line and line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])  # Remove "data: " prefix
+                                
+                                if data.get("error"):
+                                    st.error(f"❌ {data['error']}")
+                                    break
+                                
+                                if data.get("token"):
+                                    full_response += data["token"]
+                                    placeholder.markdown(full_response + "▌")
+                                
+                                if data.get("done"):
+                                    sources = data.get("sources", [])
+                                    break
+                                    
+                            except json.JSONDecodeError:
+                                continue
                     
-                    if not answer:
-                        st.warning("Model nie wygenerował żadnej treści. Możliwy problem z promptem lub modelem.")
-                    else:
-                        print(f"DEBUG: Received answer from API. Length: {len(answer)}")
-                        st.success(f"Odpowiedź wygenerowana w {duration:.1f} sekund.")
-                        st.markdown(f"### Odpowiedź:\n{answer}")
-                        # Optional: st.write(answer) to bypass markdown parsing if it's the issue
-
+                    # Final display without cursor
+                    placeholder.markdown(full_response)
                     
+                    # Display sources
                     if sources:
                         with st.expander("Zobacz źródła"):
                             for source in sources:
-                                score_val = source.get('score')
+                                score_val = source.get('score', 0)
                                 prob = (1 - score_val) if score_val is not None else 0.0
-                                st.markdown(f"""
-                                    <div class="source-box">
-                                        <div class="citation">{source['citation']} (Prawdopodobieństwo: {prob:.2f})</div>
-                                        <div style="font-size: 0.85em; margin-top: 5px;">{source['text'][:500]}...</div>
-                                    </div>
-                                """, unsafe_allow_html=True)
+                                st.markdown(f"**{source['citation']}** (Relevance: {prob:.2f})")
+                                st.text(source['text'][:500] + "...")
+                                st.divider()
                     
-                    # Store in history
+                    # Save to history
                     st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": answer if answer else "Błąd: Brak odpowiedzi z modelu.",
+                        "role": "assistant",
+                        "content": full_response,
                         "sources": sources
                     })
-                    
-                    # Force rerun to show message in history
-                    st.rerun()
                 else:
-                    st.error(f"Błąd API ({response.status_code}): {response.text}")
-            except Exception as e:
-                st.error(f"Wystąpił błąd podczas komunikacji z API: {e}")
-
-
+                    st.error(f"❌ Błąd API ({response.status_code})")
+                    
+        except Exception as e:
+            st.error(f"❌ Błąd: {str(e)}")

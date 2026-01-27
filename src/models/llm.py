@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from llama_cpp import Llama
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Generator
 from src.utils.config import LLAMA_GGUF_PATH, LLAMA_N_CTX
 from src.utils.logger import setup_logger
 
@@ -31,3 +31,16 @@ class LlamaModel:
         )
         text = resp.get("choices", [{}])[0].get("text", "").strip()
         return text, resp
+
+    def generate_stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.0) -> Generator[str, None, None]:
+        """Generate tokens one at a time for streaming."""
+        logger.info("Streaming answer from LLM...")
+        for chunk in self.llm(
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True
+        ):
+            token = chunk.get("choices", [{}])[0].get("text", "")
+            if token:
+                yield token

@@ -132,3 +132,5 @@ requests
 fastapi
 uvicorn[standard]
 pydantic
+redis
+sseclient-py

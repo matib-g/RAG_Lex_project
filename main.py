@@ -138,11 +138,32 @@ def run_update(args):
     parser_update.add_argument("--batch_size", type=int, default=64, help="Batch size")
     parser_update.set_defaults(func=run_update)
 
+    # Evaluate
+    parser_eval = subparsers.add_parser("evaluate", help="Run quality evaluation on test questions")
+    parser_eval.add_argument("--questions", "-q", type=str, default="TEST_QUESTIONS.md", help="Path to questions file")
+    parser_eval.add_argument("--output", "-o", type=str, default="evaluation_results.json", help="Output file path")
+    parser_eval.set_defaults(func=run_evaluate)
+
     args = parser.parse_args()
     if hasattr(args, "func"):
         args.func(args)
     else:
         parser.print_help()
+
+
+def run_evaluate(args):
+    """Run evaluation benchmark."""
+    from src.evaluation.eval import evaluate_from_file
+    
+    questions_path = Path(args.questions)
+    output_path = Path(args.output)
+    
+    if not questions_path.exists():
+        logger.error(f"Questions file not found: {questions_path}")
+        sys.exit(1)
+    
+    evaluate_from_file(questions_path, output_path)
+
 
 if __name__ == "__main__":
     main()
