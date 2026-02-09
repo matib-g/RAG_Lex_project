@@ -58,14 +58,27 @@ class SejmDownloader:
     def check_for_updates(self, publisher: str, year: int) -> List[Dict]:
         """
         Populate a list of missing acts for a given publisher and year.
-        Fetch all acts metadata first (limit=9999), check local existence.
+        Fetch all acts metadata using pagination to avoid server errors.
         """
         logger.info(f"Checking for updates {publisher}/{year}...")
         
-        # 1. Get all acts metadata
-        # Assuming < 5000 acts per year usually
-        all_acts_data = self.fetch_acts_for_year(publisher, year, limit=5000, offset=0)
-        all_items = all_acts_data.get("items", [])
+        all_items = []
+        offset = 0
+        limit = 500  # Smaller batch size to prevent 500 errors
+        
+        while True:
+            logger.info(f"Fetching acts list... (offset: {offset})")
+            data = self.fetch_acts_for_year(publisher, year, limit=limit, offset=offset)
+            items = data.get("items", [])
+            if not items:
+                break
+                
+            all_items.extend(items)
+            offset += limit
+            
+            # If we got fewer items than requested, we reached the end
+            if len(items) < limit:
+                break
         
         missing_items = []
         for item in all_items:

@@ -11,14 +11,17 @@ class VectorStore:
         logger.info(f"Opening ChromaDB persistent at: {persist_path}")
         self.client = chromadb.PersistentClient(path=str(persist_path))
         self.collection_name = collection_name
-        self.collection = self.client.get_or_create_collection(name=collection_name)
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"}
+        )
 
     def add_documents(self, ids: List[str], documents: List[str], metadatas: List[Dict[str, Any]], embeddings: List[List[float]]):
         """
-        Adds documents to the collection.
+        Adds or updates documents in the collection (upsert).
         """
-        logger.info(f"Adding {len(documents)} documents to collection '{self.collection_name}'")
-        self.collection.add(
+        logger.info(f"Upserting {len(documents)} documents to collection '{self.collection_name}'")
+        self.collection.upsert(
             ids=ids,
             documents=documents,
             metadatas=metadatas,

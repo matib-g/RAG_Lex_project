@@ -12,9 +12,13 @@ class EmbeddingModel:
 
     def encode(self, texts: List[str], show_progress_bar: bool = False) -> List[List[float]]:
         """
-        Embeds a list of texts.
+        Embeds a list of texts with normalization.
         """
-        embeddings = self.model.encode(texts, show_progress_bar=show_progress_bar)
+        embeddings = self.model.encode(
+            texts, 
+            show_progress_bar=show_progress_bar,
+            normalize_embeddings=True
+        )
         
         # Ensure it returns list of lists (if it returns user numpy array)
         if hasattr(embeddings, "tolist"):

@@ -3,11 +3,7 @@ from src.api.schemas import QueryRequest, QueryResponse, Source, UpdateRequest, 
 from src.utils.logger import setup_logger
 
 # Import our modular logic
-from src.data_ingestion.downloader import SejmDownloader
-from src.data_ingestion.preprocessor import DataPreprocessor
-from src.data_ingestion.indexer import VectorIndexer
-from src.database.vector_store import VectorStore
-from src.models.embedding import EmbeddingModel
+from src.data_ingestion.workflow import run_incremental_update
 
 logger = setup_logger("api_routes")
 router = APIRouter()
@@ -36,7 +32,8 @@ def query_rag(request: QueryRequest, req_obj: Request):
                 citation=hit.get("citation", "Unknown"),
                 text=hit.get("text", ""),
                 rank=hit.get("rank", 0),
-                score=hit.get("score", 0.0)
+                score=hit.get("score", 0.0),
+                url=hit.get("url")
             ))
             
         logger.info(f"Query processed successfully. Answer length: {len(result['answer'])}")
@@ -51,41 +48,17 @@ def query_rag(request: QueryRequest, req_obj: Request):
 
 def background_update_task(req: UpdateRequest):
     """
-    Background task logic for incremental update.
+    Background task logic for incremental update using shared workflow.
     """
     try:
         logger.info(f"Starting background update for {req.publisher}/{req.year}")
-        downloader = SejmDownloader()
-        missing_items = downloader.check_for_updates(req.publisher, req.year)
-        
-        if not missing_items:
-            logger.info("No updates found.")
-            return
-
-        to_download = missing_items[:req.limit]
-        logger.info(f"Downloading {len(to_download)} new acts.")
-        
-        manifest = downloader.download_acts(req.publisher, req.year, specific_items=to_download)
-        if not manifest:
-            return
-            
-        downloaded_files = [item["filename"] for item in manifest]
-        
-        preprocessor = DataPreprocessor()
-        new_data = preprocessor.process_files(max_chars=req.max_chars, specific_files=downloaded_files)
-        
-        if not new_data:
-            return
-
-        # Initialize indexing components fresh (safe for threads usually if instances are separate)
-        # Or reuse global ones? Safest to create new lightweight wrappers for indexing 
-        # as it happens rarely.
-        emb_model = EmbeddingModel()
-        vector_store = VectorStore()
-        indexer = VectorIndexer(vector_store, emb_model)
-        
-        indexer.index_data(dataset=new_data, batch_size=req.batch_size)
-        logger.info("Background update completed.")
+        run_incremental_update(
+            publisher=req.publisher,
+            year=req.year,
+            limit=req.limit,
+            max_chars=req.max_chars,
+            batch_size=req.batch_size
+        )
     except Exception as e:
         logger.error(f"Error in background update: {e}")
 
@@ -144,7 +117,7 @@ def query_stream(request: QueryRequest, req_obj: Request):
                 yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
             
             # Send sources at the end
-            sources = [{"citation": h["citation"], "text": h["text"], "score": h["score"]} for h in hits]
+            sources = [{"citation": h["citation"], "text": h["text"], "score": h["score"], "url": h.get("url")} for h in hits]
             yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
             
             # Cache the full answer

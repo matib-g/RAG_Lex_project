@@ -1,4 +1,3 @@
-import json
 from typing import List, Tuple, Dict, Any
 from src.utils.config import PROMPT_MAX_CHARS, LLAMA_N_CTX
 from src.utils.logger import setup_logger
@@ -31,10 +30,27 @@ class RAGPipeline:
 
         hits = []
         for i, (doc, meta, dist) in enumerate(zip(docs, metadatas, distances)):
+            # 1. Base Citation
             citation = meta.get("filename", "unknown")
-            if meta.get("year") and meta.get("pos"):
-                citation = f"{meta.get('publisher', '')}_{meta.get('year', '')}_poz.{meta.get('pos', '')}"
+            year = meta.get("year")
+            pos = meta.get("pos")
+            publisher = meta.get("publisher", "")
             
+            if year and pos:
+                citation = f"{publisher}_{year}_poz.{pos}"
+            
+            # 2. ISAP URL calculation
+            # Pattern: http://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=W{pub}{year}{pos_padded}
+            url = None
+            if year and pos and publisher:
+                try:
+                    prefix = f"W{publisher.upper()}"
+                    # ISAP uses 7-digit zero-padded position
+                    pos_padded = str(pos).zfill(7)
+                    url = f"https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id={prefix}{year}{pos_padded}"
+                except Exception as e:
+                    logger.warning(f"Failed to construct URL for {citation}: {e}")
+
             chunk_id = meta.get("chunk_id", None)
             full_citation = f"{citation}#{chunk_id}" if chunk_id is not None else citation
             
@@ -43,7 +59,8 @@ class RAGPipeline:
                 "score": float(dist) if dist is not None else None,
                 "text": doc,
                 "meta": meta,
-                "citation": full_citation
+                "citation": full_citation,
+                "url": url
             })
 
         # Compose context
@@ -61,25 +78,39 @@ class RAGPipeline:
 
     def build_prompt(self, question: str, context: str) -> str:
         """
-        Constructs the prompt for the LLM.
-        """
-        prompt = f"""
-        Jesteś ekspertem prawa polskiego. Odpowiedz na zadane pytanie **wyłącznie** na podstawie poniższych fragmentów ustaw (nie wymyślaj dodatkowych informacji).
-        Jeśli fragmenty są sprzeczne lub niewystarczające, zaznacz to i wskaż jakie dodatkowe źródła byłyby potrzebne.
-        Podaj odpowiedź po polsku. Na końcu krótkie odniesienie do użytych źródeł (np. "Źródła: DU_2020_poz.123#4).
-
-        Poniżej fragmenty aktów:
-        {context}
-
-        Pytanie: {question}
-
-        Odpowiedź:
-        """.strip()
+        Constructs the prompt for the LLM using chat template format.
         
-        # Simple truncation to fit context window approximately (considering system prompt + generation)
-        # 1 token approx 4 chars, so LLAMA_N_CTX * 4 is rough char limit.
-        if len(prompt) > LLAMA_N_CTX * 3:
-            return prompt[:LLAMA_N_CTX * 3] + "..."
+        Uses Llama-2/Mistral style [INST] template which is compatible
+        with most Polish instruction-tuned models including PLLuM.
+        """
+        system_prompt = """Jesteś ekspertem prawa polskiego. Odpowiadasz na pytania wyłącznie na podstawie podanych fragmentów ustaw.
+Zasady:
+1. Nie wymyślaj informacji spoza kontekstu.
+2. Jeśli kontekst jest niewystarczający, powiedz to wprost.
+3. Na końcu podaj źródła (np. "Źródła: DU_2020_poz.123#4")."""
+
+        user_message = f"""Fragmenty aktów prawnych:
+{context}
+
+Pytanie: {question}"""
+
+        # Llama-2 / Mistral chat template format
+        # [INST] <<SYS>> system prompt <</SYS>> user message [/INST]
+        prompt = f"""<s>[INST] <<SYS>>
+{system_prompt}
+<</SYS>>
+
+{user_message} [/INST]"""
+        
+        # Token-based truncation (more accurate than char-based)
+        # Approximate: 1 token ≈ 4 chars for Polish text
+        max_prompt_chars = LLAMA_N_CTX * 3  # Leave room for generation
+        if len(prompt) > max_prompt_chars:
+            # Truncate context, not the question
+            available_for_context = max_prompt_chars - len(prompt) + len(context)
+            truncated_context = context[:available_for_context] + "..."
+            return self.build_prompt(question, truncated_context)
+        
         return prompt
 
 

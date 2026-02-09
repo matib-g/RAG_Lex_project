@@ -43,6 +43,10 @@ SEJM_API_URL = get_env("SEJM_API_URL", "https://api.sejm.gov.pl/eli/acts")
 
 # RAG Parameters
 LLAMA_N_CTX = get_env("LLAMA_N_CTX", 4096, int)
+LLAMA_N_THREADS = get_env("LLAMA_N_THREADS", 4, int)  # Default to 4, auto-detect with os.cpu_count() in llm.py
+LLAMA_N_GPU_LAYERS = get_env("LLAMA_N_GPU_LAYERS", 0, int)  # 0 = CPU only, -1 = all layers on GPU
+LLAMA_N_BATCH = get_env("LLAMA_N_BATCH", 512, int)
 TOP_K_RETRIEVAL = get_env("TOP_K_RETRIEVAL", 5, int)
 MAX_GEN_TOKENS = get_env("MAX_GEN_TOKENS", 512, int)
 PROMPT_MAX_CHARS = get_env("PROMPT_MAX_CHARS", 12000, int)
+

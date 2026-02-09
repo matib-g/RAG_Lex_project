@@ -8,6 +8,16 @@ API_URL = os.getenv("API_URL", "http://app:8000")
 STREAM_ENDPOINT = f"{API_URL}/api/v1/query/stream"
 HEALTH_ENDPOINT = f"{API_URL}/api/v1/health"
 
+def distance_to_similarity(distance: float) -> float:
+    """
+    Convert ChromaDB Cosine distance to similarity score (0-1).
+    For 'cosine' space, ChromaDB returns distance = 1 - cosine_similarity.
+    similarity = 1 - distance.
+    """
+    if distance is None:
+        return 0.0
+    return max(0.0, 1.0 - distance)
+
 st.set_page_config(
     page_title="RAG Lex - Polski System Prawny",
     page_icon="⚖️",
@@ -55,11 +65,17 @@ for msg in st.session_state.messages:
         
         if msg.get("sources"):
             with st.expander("Zobacz źródła"):
-                for source in msg["sources"]:
-                    score_val = source.get('score', 0)
-                    prob = (1 - score_val) if score_val is not None else 0.0
-                    st.markdown(f"**{source['citation']}** (Relevance: {prob:.2f})")
-                    st.text(source['text'][:500] + "...")
+                    for source in msg["sources"]:
+                        score_val = source.get('score', 0)
+                        similarity = distance_to_similarity(score_val)
+                        
+                        citation_text = source['citation']
+                        if source.get('url'):
+                            st.markdown(f"🔗 **[{citation_text}]({source['url']})** (Similarity: {similarity:.0%})")
+                        else:
+                            st.markdown(f"**{citation_text}** (Similarity: {similarity:.0%})")
+                            
+                        st.text(source['text'][:500] + "...")
                     st.divider()
 
 # Chat input
@@ -108,8 +124,15 @@ if prompt := st.chat_input("O co chcesz zapytać?"):
                         with st.expander("Zobacz źródła"):
                             for source in sources:
                                 score_val = source.get('score', 0)
-                                prob = (1 - score_val) if score_val is not None else 0.0
-                                st.markdown(f"**{source['citation']}** (Relevance: {prob:.2f})")
+                                similarity = distance_to_similarity(score_val)
+                                
+                                # Add clickable link if available
+                                citation_text = source['citation']
+                                if source.get('url'):
+                                    st.markdown(f"🔗 **[{citation_text}]({source['url']})** (Similarity: {similarity:.0%})")
+                                else:
+                                    st.markdown(f"**{citation_text}** (Similarity: {similarity:.0%})")
+                                    
                                 st.text(source['text'][:500] + "...")
                                 st.divider()
                     

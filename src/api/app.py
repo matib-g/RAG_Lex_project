@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
+import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes import router as api_router
 from src.utils.logger import setup_logger
 
@@ -10,6 +12,9 @@ from src.database.vector_store import VectorStore
 from src.rag.pipeline import RAGPipeline
 
 logger = setup_logger("api_main")
+
+# CORS configuration - allow frontend origins
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,6 +49,15 @@ app = FastAPI(
     description="API for Polish Law RAG System",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix="/api/v1")

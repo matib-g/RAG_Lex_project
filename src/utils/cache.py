@@ -34,7 +34,7 @@ def get_redis_client() -> Optional[redis.Redis]:
 def generate_cache_key(query: str, top_k: int) -> str:
     """Generate a unique cache key for a query."""
     content = f"{query.strip().lower()}:{top_k}"
-    return f"rag:{hashlib.md5(content.encode()).hexdigest()}"
+    return f"rag:{hashlib.sha256(content.encode()).hexdigest()[:32]}"
 
 
 def get_cache(key: str) -> Optional[dict]:

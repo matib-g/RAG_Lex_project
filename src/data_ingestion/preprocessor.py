@@ -1,4 +1,3 @@
-import os
 import re
 import json
 from pathlib import Path
@@ -32,27 +31,83 @@ class DataPreprocessor:
         text = text.strip()
         return text
 
-    def chunk_text(self, text: str, max_chars: int = 1000, overlap: int = 100) -> List[str]:
+    def _split_into_sentences(self, text: str) -> List[str]:
         """
-        Splits the text into blocks with a maximum length of `max_chars`, with overlap.
+        Splits text into sentences, respecting Polish legal abbreviations.
+        Uses a protection approach: temporarily replace abbreviation periods,
+        then split, then restore.
         """
-        chunks = []
-        start = 0
-        text_len = len(text)
+        # Common Polish abbreviations that should NOT end a sentence
+        abbreviations = [
+            'art', 'ust', 'pkt', 'lit', 'zd', 'poz', 'nr', 'dz', 'u', 't', 'j',
+            'tzn', 'tj', 'np', 'ww', 'ws', 'zob', 'por', 'itd', 'itp', 's', 'r',
+            'ok', 'dr', 'mgr', 'prof', 'hab', 'inż', 'ul', 'pl', 'al', 'św', 
+            'gen', 'płk', 'mjr', 'kpt', 'w', 'm.in'
+        ]
         
-        if text_len <= max_chars:
-            return [text]
+        # Placeholder that won't appear in legal texts
+        placeholder = "<<<ABBR_DOT>>>"
+        
+        # Protect abbreviations by replacing their periods
+        protected_text = text
+        for abbr in abbreviations:
+            # Case insensitive replacement
+            pattern = re.compile(rf'\b({re.escape(abbr)})\.', re.IGNORECASE)
+            protected_text = pattern.sub(rf'\1{placeholder}', protected_text)
+        
+        # Now split on sentence-ending punctuation followed by space and uppercase
+        # This is a simple pattern that works with fixed-width lookbehind
+        sentences = re.split(r'(?<=[.!?])\s+(?=[A-ZĄĆĘŁŃÓŚŹŻ])', protected_text)
+        
+        # Restore periods in abbreviations
+        sentences = [s.replace(placeholder, '.') for s in sentences]
+        
+        return [s.strip() for s in sentences if s.strip()]
 
-        while start < text_len:
-            end = start + max_chars
-            # Ensure we don't go out of bounds (python slicing handles this but being explicit is fine)
-            chunk = text[start:end]
-            chunks.append(chunk.strip())
+    def chunk_text(self, text: str, max_chars: int = 1000, overlap_sentences: int = 1) -> List[str]:
+        """
+        Splits the text into chunks respecting sentence boundaries.
+        
+        Args:
+            text: Input text to chunk
+            max_chars: Maximum characters per chunk (soft limit - won't break sentences)
+            overlap_sentences: Number of sentences to overlap between chunks
+        """
+        sentences = self._split_into_sentences(text)
+        
+        if not sentences:
+            return [text] if text.strip() else []
+        
+        # If entire text is short enough, return as-is
+        if len(text) <= max_chars:
+            return [text]
+        
+        chunks = []
+        current_chunk_sentences = []
+        current_length = 0
+        
+        for sentence in sentences:
+            sentence_len = len(sentence) + 1  # +1 for space
             
-            start = end - overlap
-            if start >= text_len:
-                break
+            # If single sentence is longer than max_chars, include it anyway (don't break sentences)
+            if current_length + sentence_len > max_chars and current_chunk_sentences:
+                # Save current chunk
+                chunk_text = ' '.join(current_chunk_sentences)
+                chunks.append(chunk_text.strip())
                 
+                # Start new chunk with overlap (last N sentences from previous chunk)
+                overlap_start = max(0, len(current_chunk_sentences) - overlap_sentences)
+                current_chunk_sentences = current_chunk_sentences[overlap_start:]
+                current_length = sum(len(s) + 1 for s in current_chunk_sentences)
+            
+            current_chunk_sentences.append(sentence)
+            current_length += sentence_len
+        
+        # Don't forget the last chunk
+        if current_chunk_sentences:
+            chunk_text = ' '.join(current_chunk_sentences)
+            chunks.append(chunk_text.strip())
+        
         return chunks
 
     def process_files(self, max_chars: int = 1000, specific_files: List[str] = None) -> List[Dict]:
